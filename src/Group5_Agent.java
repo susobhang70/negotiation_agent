@@ -16,13 +16,18 @@ import negotiator.utility.AbstractUtilitySpace;
 /**
  * This is your negotiation party.
  */
+@SuppressWarnings("unused")
 public class Group5_Agent extends AbstractNegotiationParty {
 
-	private double discountFactor = 0; // if you want to keep the discount
+	private double fDiscountFactor = 0; // if you want to keep the discount
 										// factor
-	private double reservationValue = 0; // if you want to keep the reservation
+	private double fReservationValue = 0; // if you want to keep the reservation
 											// value
-	private double beta = 1.2;
+	private double fBeta = 1.2;
+	
+	private List<BidDetails> lOutcomeSpace;
+	
+	private int nRounds, nCurrentRound;
 
 	@Override
 	public void init(AbstractUtilitySpace utilSpace, Deadline dl,
@@ -31,16 +36,20 @@ public class Group5_Agent extends AbstractNegotiationParty {
 
 		super.init(utilSpace, dl, tl, randomSeed, agentId);
 
-		discountFactor = utilSpace.getDiscountFactor(); // read discount factor
-		System.out.println("Discount Factor is " + discountFactor);
-		reservationValue = utilSpace.getReservationValueUndiscounted(); // read
+		fDiscountFactor = utilSpace.getDiscountFactor(); // read discount factor
+		System.out.println("Discount Factor is " + fDiscountFactor);
+		fReservationValue = utilSpace.getReservationValueUndiscounted(); // read
 																		// reservation
 																		// value
-		System.out.println("Reservation Value is " + reservationValue);
+		System.out.println("Reservation Value is " + fReservationValue);
 
 		// if you need to initialize some variables, please initialize them
 		// below
 
+		lOutcomeSpace = new SortedOutcomeSpace(this.utilitySpace).getAllOutcomes();
+		
+		nRounds = this.deadlines.getValue();
+		nCurrentRound = 0;
 	}
 
 	/**
@@ -58,20 +67,16 @@ public class Group5_Agent extends AbstractNegotiationParty {
 
 		// with 50% chance, counter offer
 		// if we are the first party, also offer.
-		if (!validActions.contains(Accept.class) || Math.random() > 0.5) 
-		{
-			return new Offer(generateRandomBid());
-		}
-		else
-		{
-			return new Accept();
-		}
+		
+		Bid newbid = lOutcomeSpace.get(nCurrentRound).getBid();
+		nCurrentRound++;
+		return new Offer(newbid);
 	}
 	
 	private Double getSkewedUtility(Bid bid)
 	{
-		Double util = ((getUtility(bid)/discountFactor) - reservationValue)/(1 - reservationValue);
-		Double timeUtil = 1 - java.lang.Math.pow(this.timeline.getCurrentTime()/this.timeline.getTotalTime(), beta);
+		Double util = ((getUtility(bid)/fDiscountFactor) - fReservationValue)/(1 - fReservationValue);
+		Double timeUtil = 1 - java.lang.Math.pow(this.timeline.getCurrentTime()/this.timeline.getTotalTime(), fBeta);
 		util = util * timeUtil;
 		return util;
 	}
