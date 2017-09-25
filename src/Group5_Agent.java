@@ -1,212 +1,101 @@
+import java.util.List;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.Random;
-
-import negotiator.Agent;
+import negotiator.AgentID;
 import negotiator.Bid;
+import negotiator.Deadline;
 import negotiator.actions.Accept;
 import negotiator.actions.Action;
 import negotiator.actions.Offer;
-import negotiator.issue.Issue;
-import negotiator.issue.IssueDiscrete;
-import negotiator.issue.IssueInteger;
-import negotiator.issue.IssueReal;
-import negotiator.issue.Value;
-import negotiator.issue.ValueInteger;
-import negotiator.issue.ValueReal;
-import negotiator.session.Timeline;
-import agents.SimpleAgent;
+import negotiator.bidding.BidDetails;
+import negotiator.boaframework.SortedOutcomeSpace;
+import negotiator.parties.AbstractNegotiationParty;
+import negotiator.session.TimeLineInfo;
+import negotiator.utility.AbstractUtilitySpace;
 
 /**
- * @author W.Pasman Some improvements over the standard SimpleAgent.
- * 
- *         Random Walker, Zero Intelligence Agent
+ * This is your negotiation party.
  */
-public class Group5_Agent extends Agent {
-	private Action actionOfPartner = null;
-	/**
-	 * Note: {@link SimpleAgent} does not account for the discount factor in its
-	 * computations
-	 */
-	private static double MINIMUM_BID_UTILITY = 0.0;
+public class Group5_Agent extends AbstractNegotiationParty {
 
-	/**
-	 * init is called when a next session starts with the same opponent.
-	 */
-	@Override
-	public void init() {
-		MINIMUM_BID_UTILITY = utilitySpace.getReservationValueUndiscounted();
-	}
+	private double discountFactor = 0; // if you want to keep the discount
+										// factor
+	private double reservationValue = 0; // if you want to keep the reservation
+											// value
+	private double beta = 1.2;
 
 	@Override
-	public String getVersion() {
-		return "3.1";
-	}
+	public void init(AbstractUtilitySpace utilSpace, Deadline dl,
+			TimeLineInfo tl, long randomSeed, AgentID agentId)
+	{
 
-	@Override
-	public String getName() {
-		return "Group 5 Agent";
-	}
+		super.init(utilSpace, dl, tl, randomSeed, agentId);
 
-	@Override
-	public void ReceiveMessage(Action opponentAction) {
-		actionOfPartner = opponentAction;
-	}
-
-	@Override
-	public Action chooseAction() {
-		Action action = null;
-		try {
-			if (actionOfPartner == null)
-				action = chooseRandomBidAction();
-			if (actionOfPartner instanceof Offer) {
-				Bid partnerBid = ((Offer) actionOfPartner).getBid();
-				double offeredUtilFromOpponent = getUtility(partnerBid);
-				// get current time
-				double time = timeline.getTime();
-				action = chooseRandomBidAction();
-
-				Bid myBid = ((Offer) action).getBid();
-				double myOfferedUtil = getUtility(myBid);
-
-				// accept under certain circumstances
-				if (isAcceptable(offeredUtilFromOpponent, myOfferedUtil, time))
-					action = new Accept(getAgentID());
-
-			}
-			if (timeline.getType().equals(Timeline.Type.Time)) {
-				sleep(0.005); // just for fun
-			}
-		} catch (Exception e) {
-			System.out.println("Exception in ChooseAction:" + e.getMessage());
-			action = new Accept(getAgentID()); // best guess if things go wrong.
-		}
-		return action;
-	}
-
-	private boolean isAcceptable(double offeredUtilFromOpponent,
-			double myOfferedUtil, double time) throws Exception {
-		double P = Paccept(offeredUtilFromOpponent, time);
-		if (P > Math.random())
-			return true;
-		return false;
-	}
-
-	/**
-	 * Wrapper for getRandomBid, for convenience.
-	 * 
-	 * @return new Action(Bid(..)), with bid utility > MINIMUM_BID_UTIL. If a
-	 *         problem occurs, it returns an Accept() action.
-	 */
-	private Action chooseRandomBidAction() {
-		Bid nextBid = null;
-		try {
-			nextBid = getRandomBid();
-		} catch (Exception e) {
-			System.out.println("Problem with received bid:" + e.getMessage()
-					+ ". cancelling bidding");
-		}
-		if (nextBid == null)
-			return (new Accept(getAgentID()));
-		return (new Offer(getAgentID(), nextBid));
-	}
-
-	/**
-	 * @return a random bid with high enough utility value.
-	 * @throws Exception
-	 *             if we can't compute the utility (eg no evaluators have been
-	 *             set) or when other evaluators than a DiscreteEvaluator are
-	 *             present in the util space.
-	 */
-	private Bid getRandomBid() throws Exception {
-		HashMap<Integer, Value> values = new HashMap<Integer, Value>(); // pairs
-																		// <issuenumber,chosen
+		discountFactor = utilSpace.getDiscountFactor(); // read discount factor
+		System.out.println("Discount Factor is " + discountFactor);
+		reservationValue = utilSpace.getReservationValueUndiscounted(); // read
+																		// reservation
 																		// value
-																		// string>
-		ArrayList<Issue> issues = utilitySpace.getDomain().getIssues();
-		Random randomnr = new Random();
+		System.out.println("Reservation Value is " + reservationValue);
 
-		// create a random bid with utility>MINIMUM_BID_UTIL.
-		// note that this may never succeed if you set MINIMUM too high!!!
-		// in that case we will search for a bid till the time is up (3 minutes)
-		// but this is just a simple agent.
-		Bid bid = null;
-		do {
-			for (Issue lIssue : issues) {
-				switch (lIssue.getType()) {
-				case DISCRETE:
-					IssueDiscrete lIssueDiscrete = (IssueDiscrete) lIssue;
-					int optionIndex = randomnr.nextInt(lIssueDiscrete
-							.getNumberOfValues());
-					values.put(lIssue.getNumber(),
-							lIssueDiscrete.getValue(optionIndex));
-					break;
-				case REAL:
-					IssueReal lIssueReal = (IssueReal) lIssue;
-					int optionInd = randomnr.nextInt(lIssueReal
-							.getNumberOfDiscretizationSteps() - 1);
-					values.put(
-							lIssueReal.getNumber(),
-							new ValueReal(lIssueReal.getLowerBound()
-									+ (lIssueReal.getUpperBound() - lIssueReal
-											.getLowerBound())
-									* (double) (optionInd)
-									/ (double) (lIssueReal
-											.getNumberOfDiscretizationSteps())));
-					break;
-				case INTEGER:
-					IssueInteger lIssueInteger = (IssueInteger) lIssue;
-					int optionIndex2 = lIssueInteger.getLowerBound()
-							+ randomnr.nextInt(lIssueInteger.getUpperBound()
-									- lIssueInteger.getLowerBound());
-					values.put(lIssueInteger.getNumber(), new ValueInteger(
-							optionIndex2));
-					break;
-				default:
-					throw new Exception("issue type " + lIssue.getType()
-							+ " not supported by SimpleAgent2");
-				}
-			}
-			bid = new Bid(utilitySpace.getDomain(), values);
-		} while (getUtility(bid) < MINIMUM_BID_UTILITY);
+		// if you need to initialize some variables, please initialize them
+		// below
 
-		return bid;
 	}
 
 	/**
-	 * This function determines the accept probability for an offer. At t=0 it
-	 * will prefer high-utility offers. As t gets closer to 1, it will accept
-	 * lower utility offers with increasing probability. it will never accept
-	 * offers with utility 0.
-	 * 
-	 * @param u
-	 *            is the utility
-	 * @param t
-	 *            is the time as fraction of the total available time (t=0 at
-	 *            start, and t=1 at end time)
-	 * @return the probability of an accept at time t
-	 * @throws Exception
-	 *             if you use wrong values for u or t.
-	 * 
+	 * Each round this method gets called and ask you to accept or offer. The
+	 * first party in the first round is a bit different, it can only propose an
+	 * offer.
+	 *
+	 * @param validActions
+	 *            Either a list containing both accept and offer or only offer.
+	 * @return The chosen action.
 	 */
-	double Paccept(double u, double t1) throws Exception {
-		double t = t1 * t1 * t1; // steeper increase when deadline approaches.
-		if (u < 0 || u > 1.05)
-			throw new Exception("utility " + u + " outside [0,1]");
-		// normalization may be slightly off, therefore we have a broad boundary
-		// up to 1.05
-		if (t < 0 || t > 1)
-			throw new Exception("time " + t + " outside [0,1]");
-		if (u > 1.)
-			u = 1;
-		if (t == 0.5)
-			return u;
-		return (u - 2. * u * t + 2. * (-1. + t + Math.sqrt(sq(-1. + t) + u
-				* (-1. + 2 * t))))
-				/ (-1. + 2 * t);
+	@Override
+	public Action chooseAction(List<Class<? extends Action>> validActions)
+	{
+
+		// with 50% chance, counter offer
+		// if we are the first party, also offer.
+		if (!validActions.contains(Accept.class) || Math.random() > 0.5) 
+		{
+			return new Offer(generateRandomBid());
+		}
+		else
+		{
+			return new Accept();
+		}
+	}
+	
+	private Double getSkewedUtility(Bid bid)
+	{
+		Double util = ((getUtility(bid)/discountFactor) - reservationValue)/(1 - reservationValue);
+		Double timeUtil = 1 - java.lang.Math.pow(this.timeline.getCurrentTime()/this.timeline.getTotalTime(), beta);
+		util = util * timeUtil;
+		return util;
 	}
 
-	double sq(double x) {
-		return x * x;
+	/**
+	 * All offers proposed by the other parties will be received as a message.
+	 * You can use this information to your advantage, for example to predict
+	 * their utility.
+	 *
+	 * @param sender
+	 *            The party that did the action. Can be null.
+	 * @param action
+	 *            The action that party did.
+	 */
+	@Override
+	public void receiveMessage(AgentID sender, Action action) 
+	{
+		super.receiveMessage(sender, action);
+		// Here you hear other parties' messages
 	}
+
+	@Override
+	public String getDescription() {
+		return "example party group N";
+	}
+
 }
