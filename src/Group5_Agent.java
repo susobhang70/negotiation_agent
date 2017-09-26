@@ -27,7 +27,7 @@ public class Group5_Agent extends AbstractNegotiationParty {
 	
 	private List<BidDetails> lOutcomeSpace;
 	
-	private int nRounds, nCurrentRound;
+	private int nRounds, nCurrentRound, nCount;
 
 	@Override
 	public void init(AbstractUtilitySpace utilSpace, Deadline dl,
@@ -50,6 +50,7 @@ public class Group5_Agent extends AbstractNegotiationParty {
 		
 		nRounds = this.deadlines.getValue();
 		nCurrentRound = 0;
+		nCount = 0;
 	}
 
 	/**
@@ -67,9 +68,14 @@ public class Group5_Agent extends AbstractNegotiationParty {
 
 		// with 50% chance, counter offer
 		// if we are the first party, also offer.
-		
-		Bid newbid = lOutcomeSpace.get(nCurrentRound).getBid();
 		nCurrentRound++;
+		Bid newbid = lOutcomeSpace.get(nCount).getBid();
+		nCount++;
+		if(getUtility(newbid) < fReservationValue)
+		{
+			nCount = 0;
+			newbid = lOutcomeSpace.get(nCount).getBid();
+		}
 		return new Offer(newbid);
 	}
 	
