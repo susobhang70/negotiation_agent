@@ -71,7 +71,7 @@ public class Group5_Agent extends AbstractNegotiationParty {
 		nCurrentRound++;
 		Bid newbid = lOutcomeSpace.get(nCount).getBid();
 		nCount++;
-		if(getUtility(newbid) < fReservationValue)
+		if(getUtility(newbid) < Math.min(0.5 + fReservationValue * 1.3, getUtility(lOutcomeSpace.get(0).getBid())))
 		{
 			nCount = 0;
 			newbid = lOutcomeSpace.get(nCount).getBid();
