@@ -17,7 +17,7 @@ import negotiator.utility.AbstractUtilitySpace;
  * This is your negotiation party.
  */
 @SuppressWarnings("unused")
-public class Group5_Agent extends AbstractNegotiationParty {
+public class Group5 extends AbstractNegotiationParty {
 
 	private double fDiscountFactor = 0; // if you want to keep the discount
 										// factor
