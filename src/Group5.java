@@ -17,17 +17,19 @@ import negotiator.utility.AbstractUtilitySpace;
  * This is your negotiation party.
  */
 @SuppressWarnings("unused")
-public class Group5 extends AbstractNegotiationParty {
+public class Group5 extends AbstractNegotiationParty
+{
 
-	private double fDiscountFactor = 0; // if you want to keep the discount
-										// factor
-	private double fReservationValue = 0; // if you want to keep the reservation
-											// value
+	private double fDiscountFactor = 0;
+	private double fReservationValue = 0;
+
 	private double fBeta = 1.2;
 	
 	private List<BidDetails> lOutcomeSpace;
-	
 	private int nRounds, nCurrentRound, nCount;
+
+	private HashMap<AgentID, List<Bid>> bidHistory;
+	private Bid lastBid;
 
 	@Override
 	public void init(AbstractUtilitySpace utilSpace, Deadline dl,
@@ -38,16 +40,14 @@ public class Group5 extends AbstractNegotiationParty {
 
 		fDiscountFactor = utilSpace.getDiscountFactor(); // read discount factor
 		System.out.println("Discount Factor is " + fDiscountFactor);
-		fReservationValue = utilSpace.getReservationValueUndiscounted(); // read
-																		// reservation
-																		// value
+		fReservationValue = utilSpace.getReservationValueUndiscounted();
+
 		System.out.println("Reservation Value is " + fReservationValue);
 
-		// if you need to initialize some variables, please initialize them
-		// below
-
 		lOutcomeSpace = new SortedOutcomeSpace(this.utilitySpace).getAllOutcomes();
-		
+
+		bidHistory = new HashMap<AgentID, List<Bid>>();
+
 		nRounds = this.deadlines.getValue();
 		nCurrentRound = 0;
 		nCount = 0;
@@ -65,11 +65,13 @@ public class Group5 extends AbstractNegotiationParty {
 	@Override
 	public Action chooseAction(List<Class<? extends Action>> validActions)
 	{
-
-		// with 50% chance, counter offer
-		// if we are the first party, also offer.
 		nCurrentRound++;
+
+		if(nCurrentRound >= nRounds - 5 && getUtility(this.lastBid) > fReservationValue)
+			return new Accept();
+
 		Bid newbid = lOutcomeSpace.get(nCount).getBid();
+
 		nCount++;
 		if(getUtility(newbid) < Math.min(0.5 + fReservationValue * 1.3, getUtility(lOutcomeSpace.get(0).getBid())))
 		{
@@ -102,11 +104,24 @@ public class Group5 extends AbstractNegotiationParty {
 	{
 		super.receiveMessage(sender, action);
 		// Here you hear other parties' messages
+
+		if(action instanceof Offer)
+		{
+			this.lastBid = ((Offer)action).getBid();
+
+			List<Bid> bidList;
+			if(!this.bidHistory.containsKey(sender))
+				this.bidHistory.put(sender, bidList = new ArrayList<Bid>());
+
+			bidList = this.bidHistory.get(sender);
+			bidList.add(lastBid);
+		}
 	}
 
 	@Override
-	public String getDescription() {
-		return "example party group N";
+	public String getDescription()
+	{
+		return "Group 5 Improved Agent";
 	}
 
 }
