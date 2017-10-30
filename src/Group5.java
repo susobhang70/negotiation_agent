@@ -23,6 +23,11 @@ import negotiator.utility.AdditiveUtilitySpace;
 import negotiator.utility.Evaluator;
 import negotiator.utility.EvaluatorDiscrete;
 
+//import com.joptimizer.functions.ConvexMultivariateRealFunction;
+//import com.joptimizer.functions.LinearMultivariateRealFunction;
+//import com.joptimizer.optimizers.JOptimizer;
+//import com.joptimizer.optimizers.OptimizationRequest;
+
 /**
  * This is your negotiation party.
  */
@@ -40,7 +45,7 @@ public class Group5 extends AbstractNegotiationParty
 	private List<Issue> lIssue; 
 	private HashMap<AgentID, AdditiveUtilitySpace> lAgentUtilSpaces;
 	private int nRounds, nCurrentRound, nCount, nIssues;
-	private int nRejectOffers;
+	private int nRejectOffers, nValues;
 
 	private HashMap<AgentID, List<Bid>> bidHistory;
 	private HashMap<AgentID, Bid> highestOfferedBids;
@@ -72,6 +77,18 @@ public class Group5 extends AbstractNegotiationParty
 		nIssues = lIssue.size();
 		nCurrentRound = 0;
 		nCount = 0;
+		
+		for (Map.Entry<Objective, Evaluator> e : ((AdditiveUtilitySpace)this.utilitySpace).getEvaluators())
+		{
+			Iterator<?> it = ((IssueDiscrete)e.getKey()).getValues().iterator();
+			while (it.hasNext())
+			{
+				ValueDiscrete value = (ValueDiscrete)it.next();
+				nValues++;
+			}
+		}
+		
+		System.out.println("Values: " + nValues);
 
 		// number of rounds to defect in order to read the preferences of other agents
 		if(fDiscountFactor != 1.0D)
@@ -249,7 +266,6 @@ public class Group5 extends AbstractNegotiationParty
 		double fCurrentSum = 1.0 + (fIncrement * nChanged);
 		double fMaxWeight = 1.0 - (nIssues * fIncrement / fCurrentSum);
 
-
 		// here we update the weights of each of the changed issues, and normalize the rest so that sum is 1
 		for(Issue i : lIssue)
 		{
@@ -286,5 +302,12 @@ public class Group5 extends AbstractNegotiationParty
 		}
 
 		lAgentUtilSpaces.put(agent, agentUtilSpace);
+	}
+	
+	private void optimize()
+	{
+		double[] A = new double[this.nValues];
+		
+		
 	}
 }
