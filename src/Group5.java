@@ -36,9 +36,6 @@ public class Group5 extends AbstractNegotiationParty
 	private static final double defectDiscount = 0.9;
 	private static final double epsilon = 0.02;
 	private static final double minIncrement = 0.000001;
-	
-//	protected DoubleFactory1D F1;
-//	protected DoubleFactory2D F2;
 
 	private double fDiscountFactor = 0;
 	private double fReservationValue = 0;
@@ -126,9 +123,6 @@ public class Group5 extends AbstractNegotiationParty
 	public Action chooseAction(List<Class<? extends Action>> validActions)
 	{
 		nCurrentRound++;
-
-		if(nCurrentRound >= nRounds - 5 && getUtility(this.lastBid) > fReservationValue)
-			return new Accept();
 		
 		if(getUtility(this.lastBid) >= Group5.defectDiscount)
 			return new Accept();
@@ -141,22 +135,22 @@ public class Group5 extends AbstractNegotiationParty
 			return new Offer(newbid);
 		}
 		
+		// this is whether to accept the last bid
 		int satisfies = 0;
 		double lastUtil = this.utilitySpace.getUtility(this.lastBid);
 		for(Map.Entry<AgentID, AdditiveUtilitySpace> e: this.lAgentUtilSpaces.entrySet())
 		{
 			double otherUtil = e.getValue().getUtility(this.lastBid);
-			if(lastUtil > otherUtil + 0.2 && lastUtil > this.fReservationValue)
-			{
+			if(lastUtil > (otherUtil + 0.2) && lastUtil > this.fReservationValue)
 				satisfies++;
-			}
 		}
 		
-		if(satisfies >= this.lAgentUtilSpaces.size())
+		if(satisfies == this.lAgentUtilSpaces.size())
 			return new Accept();
 		
 		// The following is a fail safe
 		Bid newbid = lOutcomeSpace.get(nCount).getBid();
+		Bid oppHighBid = null;
 
 		nCount++;
 		if(getUtility(newbid) < Math.min(0.5 + fReservationValue * 1.3, getUtility(lOutcomeSpace.get(0).getBid())))
@@ -174,15 +168,33 @@ public class Group5 extends AbstractNegotiationParty
 			if(tempMap == null)
 				continue;
 			double minUtil = 2.0;
+			double maxOppUtil = 0.0;
 			for(BidDetails bid: tempMap.values())
 			{
+				double tempUtil = 0.0;
+				for(Map.Entry<AgentID, AdditiveUtilitySpace> e1: this.lAgentUtilSpaces.entrySet())
+					tempUtil += (e1.getValue().getUtility(bid.getBid()) + 0.13);
 				if(this.utilitySpace.getUtility(bid.getBid()) < minUtil)
+				{
 					newbid = bid.getBid();
+					minUtil = this.utilitySpace.getUtility(bid.getBid());
+				}
+				if(tempUtil > maxOppUtil)
+				{
+					oppHighBid = bid.getBid();
+					maxOppUtil = tempUtil;
+				}
 			}
-			this.lastBid = newbid;
-			System.out.print("["+e.getKey()+"]" + newbid.toString() + " Mine: " + minUtil);
+//			this.lastBid = newbid;
+//			System.out.print("["+e.getKey()+"]" + newbid.toString() + " Mine: " + minUtil);
+//			for(Map.Entry<AgentID, AdditiveUtilitySpace> e1: this.lAgentUtilSpaces.entrySet())
+//				System.out.print(e1.getKey().toString() + " " + e1.getValue().getUtility(newbid) + " ");
+//			System.out.println();
+
+			this.lastBid = oppHighBid;
+			System.out.print("["+e.getKey()+"]" + oppHighBid.toString() + " Mine: " + this.utilitySpace.getUtility(oppHighBid) +" ");
 			for(Map.Entry<AgentID, AdditiveUtilitySpace> e1: this.lAgentUtilSpaces.entrySet())
-				System.out.print(e1.getKey().toString() + " " + e1.getValue().getUtility(newbid) + " ");
+				System.out.print(e1.getKey().toString() + " " + e1.getValue().getUtility(oppHighBid) + " ");
 			System.out.println();
 			break;
 		}
@@ -362,7 +374,7 @@ public class Group5 extends AbstractNegotiationParty
 			return null;
 
 		TreeMap<Integer, TreeMap<Double, BidDetails>> allBidEvals = 
-				new TreeMap<Integer, TreeMap<Double, BidDetails>>();
+				new TreeMap<Integer, TreeMap<Double, BidDetails>>(Collections.reverseOrder());
 		
 		System.out.println(this.lOutcomeSpace.size());
 		
@@ -373,7 +385,7 @@ public class Group5 extends AbstractNegotiationParty
 			for(Map.Entry<AgentID, AdditiveUtilitySpace> e: this.lAgentUtilSpaces.entrySet())
 			{
 				double otherUtil = e.getValue().getUtility(bid.getBid());
-				if(tempUtil > otherUtil + 0.2 && tempUtil > this.fReservationValue)
+				if(tempUtil > (otherUtil + 0.2) && tempUtil > this.fReservationValue)
 				{
 					satisfies++;
 //					System.out.println(bid.getBid().toString() + " Mine: " + tempUtil + " Other: " + otherUtil);
