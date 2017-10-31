@@ -1,6 +1,9 @@
 import java.util.List;
 import java.util.Map;
+import java.util.TreeMap;
+import java.util.concurrent.TimeUnit;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import negotiator.AgentID;
@@ -23,19 +26,6 @@ import negotiator.utility.AdditiveUtilitySpace;
 import negotiator.utility.Evaluator;
 import negotiator.utility.EvaluatorDiscrete;
 
-import com.joptimizer.functions.ConvexMultivariateRealFunction;
-import com.joptimizer.functions.LinearMultivariateRealFunction;
-import com.joptimizer.optimizers.BIPLokbaTableMethod;
-import com.joptimizer.optimizers.BIPOptimizationRequest;
-import com.joptimizer.optimizers.JOptimizer;
-import com.joptimizer.optimizers.OptimizationRequest;
-import com.joptimizer.optimizers.OptimizationRequestHandler;
-
-import cern.colt.matrix.tdouble.DoubleFactory1D;
-import cern.colt.matrix.tdouble.DoubleFactory2D;
-import cern.colt.matrix.tdouble.DoubleMatrix1D;
-import cern.colt.matrix.tdouble.DoubleMatrix2D;
-
 /**
  * This is your negotiation party.
  */
@@ -45,9 +35,10 @@ public class Group5 extends AbstractNegotiationParty
 
 	private static final double defectDiscount = 0.9;
 	private static final double epsilon = 0.02;
+	private static final double minIncrement = 0.000001;
 	
-	protected DoubleFactory1D F1;
-	protected DoubleFactory2D F2;
+//	protected DoubleFactory1D F1;
+//	protected DoubleFactory2D F2;
 
 	private double fDiscountFactor = 0;
 	private double fReservationValue = 0;
@@ -150,7 +141,21 @@ public class Group5 extends AbstractNegotiationParty
 			return new Offer(newbid);
 		}
 		
-		// TODO fix the below part, as it's primitive idea. Put optimization here
+		int satisfies = 0;
+		double lastUtil = this.utilitySpace.getUtility(this.lastBid);
+		for(Map.Entry<AgentID, AdditiveUtilitySpace> e: this.lAgentUtilSpaces.entrySet())
+		{
+			double otherUtil = e.getValue().getUtility(this.lastBid);
+			if(lastUtil > otherUtil + 0.2 && lastUtil > this.fReservationValue)
+			{
+				satisfies++;
+			}
+		}
+		
+		if(satisfies >= this.lAgentUtilSpaces.size())
+			return new Accept();
+		
+		// The following is a fail safe
 		Bid newbid = lOutcomeSpace.get(nCount).getBid();
 
 		nCount++;
@@ -161,7 +166,26 @@ public class Group5 extends AbstractNegotiationParty
 		}
 		this.lastBid = newbid;
 
-		this.optimize();
+		// This is the optimized function
+		TreeMap<Integer, TreeMap<Double, BidDetails>> bidEvals = this.optimize();
+		for(Map.Entry<Integer, TreeMap<Double, BidDetails>> e : bidEvals.entrySet())
+		{
+			TreeMap<Double, BidDetails> tempMap = e.getValue();
+			if(tempMap == null)
+				continue;
+			double minUtil = 2.0;
+			for(BidDetails bid: tempMap.values())
+			{
+				if(this.utilitySpace.getUtility(bid.getBid()) < minUtil)
+					newbid = bid.getBid();
+			}
+			this.lastBid = newbid;
+			System.out.print("["+e.getKey()+"]" + newbid.toString() + " Mine: " + minUtil);
+			for(Map.Entry<AgentID, AdditiveUtilitySpace> e1: this.lAgentUtilSpaces.entrySet())
+				System.out.print(e1.getKey().toString() + " " + e1.getValue().getUtility(newbid) + " ");
+			System.out.println();
+			break;
+		}
 
 		return new Offer(newbid);
 	}
@@ -332,117 +356,41 @@ public class Group5 extends AbstractNegotiationParty
 		lAgentUtilSpaces.put(agent, agentUtilSpace);
 	}
 	
-	private void optimize()
+	private TreeMap<Integer, TreeMap<Double, BidDetails>> optimize()
 	{
 		if(this.nCurrentRound < this.nRejectOffers)
-			return;
+			return null;
 
-		double[] A = new double[this.nValues];
-		double[][] constraints = new double[this.nIssues*2 + this.lAgentUtilSpaces.size()][];
-		double[] bounds = new double[this.nIssues*2 + this.lAgentUtilSpaces.size()];
-
-		// this is the A or maximization function array calculation
-		int i = 0;
+		TreeMap<Integer, TreeMap<Double, BidDetails>> allBidEvals = 
+				new TreeMap<Integer, TreeMap<Double, BidDetails>>();
 		
-		// Constructs A for only this agent
-		// For other agents, run a loop over this, for their utility spaces
+		System.out.println(this.lOutcomeSpace.size());
 		
-		for(Issue is: lIssue)
+		for(BidDetails bid: this.lOutcomeSpace)
 		{
-			double w = ((AdditiveUtilitySpace)this.utilitySpace).getWeight(is.getNumber());
-			for(ValueDiscrete val: this.hValuesOfIssue.get(is))
+			double tempUtil = this.utilitySpace.getUtility(bid.getBid());
+			int satisfies = 0;
+			for(Map.Entry<AgentID, AdditiveUtilitySpace> e: this.lAgentUtilSpaces.entrySet())
 			{
-				try 
+				double otherUtil = e.getValue().getUtility(bid.getBid());
+				if(tempUtil > otherUtil + 0.2 && tempUtil > this.fReservationValue)
 				{
-					double v = getValueEvaulation(this.utilitySpace, is, val);
-					A[i] = w * v;
-				} 
-				catch (Exception e1)
-				{
-					// TODO Auto-generated catch block
-					e1.printStackTrace();
-				}
-				i++;
-			}
-		}
-
-		i = 0;
-
-		// This is for picking a value in an issue. Set the right side to 1 when inserting to the solver
-		// Two sets being used, so as to do something like x1 + x2 <=1 and x1 + x2 >= 1 (i.e. -x1 -x2 <= -1)
-		for(Issue is: lIssue)
-		{
-			constraints[i] = new double[this.lValuesPerIssue.get(is)];
-			constraints[i + this.nIssues] = new double[this.lValuesPerIssue.get(is)];
-			for(int j = 0; j < constraints[i].length; j++)
-			{
-				constraints[i][j] = 1;
-				bounds[i] = 1;
-				constraints[i + this.nIssues][j] = -1;
-				bounds[i + this.nIssues] = -1;
-			}
-			i++;
-		}
-
-		i = 2 * this.nIssues;
-
-		// this is for the constraints utility (opponents utility as constraints)
-		for(Map.Entry<AgentID, AdditiveUtilitySpace> e: this.lAgentUtilSpaces.entrySet())
-		{
-			int j = 0;
-			constraints[i] = new double [this.nValues];
-			for(Issue is: lIssue)
-			{
-				double w1 = ((AdditiveUtilitySpace)this.utilitySpace).getWeight(is.getNumber());
-				double w2 = e.getValue().getWeight(is.getNumber());
-
-				for(ValueDiscrete v: this.hValuesOfIssue.get(is))
-				{
-					try 
-					{
-						// it should be of the form (their - ours) < -epsilon
-
-						double v1 = getValueEvaulation(this.utilitySpace, is, v);
-						double v2 = getValueEvaulation(e.getValue(), is, v);
-						constraints[i][j] = (w2*v2 - w1*v1);
-						bounds[i] = -Group5.epsilon;
-					}
-					catch (Exception e1)
-					{
-						// TODO Auto-generated catch block
-						e1.printStackTrace();
-					}
-					j++;
+					satisfies++;
+//					System.out.println(bid.getBid().toString() + " Mine: " + tempUtil + " Other: " + otherUtil);
 				}
 			}
-			i++;
+			if(satisfies > 0)
+			{
+				if(!allBidEvals.containsKey(satisfies))
+					allBidEvals.put(satisfies, new TreeMap<Double, BidDetails>(Collections.reverseOrder()));
+				TreeMap<Double, BidDetails> tempMap = allBidEvals.get(satisfies);
+				while(tempMap.containsKey(tempUtil))
+					tempUtil += minIncrement;
+				tempMap.put(tempUtil, bid);
+				allBidEvals.put(satisfies, tempMap);
+			}
 		}
-		
-//		DoubleMatrix1D c = F1.make(A);
-//		DoubleMatrix2D G = F2.make(constraints);
-//		DoubleMatrix1D h = F1.make(bounds);
-//		
-//		BIPOptimizationRequest or = new BIPOptimizationRequest();
-//		or.setC(c);
-//		or.setG(G);
-//		or.setH(h);
-//		or.setDumpProblem(true);
-		
-		BIPLokbaTableMethod opt = new BIPLokbaTableMethod();
-//		opt.setBIPOptimizationRequest(or);
-//		try {
-//			opt.optimize();
-//		} catch (Exception e1) {
-//			// TODO Auto-generated catch block
-//			e1.printStackTrace();
-//		}
-//		
-//		int[] sol = opt.getBIPOptimizationResponse().getSolution();
-//		
-//		for(int it = 0; it < sol.length; it++)
-//			System.out.print(sol[it] + " ");
-//		
-//		System.out.println(" ");
+		return allBidEvals;
 	}
 	
 	private double getValueEvaulation(AbstractUtilitySpace utilSpace, Issue issue, ValueDiscrete value) throws Exception
