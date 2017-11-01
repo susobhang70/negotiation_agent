@@ -124,6 +124,8 @@ public class Group5 extends AbstractNegotiationParty
 	{
 		nCurrentRound++;
 		
+		// TODO add final round decision
+		
 		if(getUtility(this.lastBid) >= Group5.defectDiscount)
 			return new Accept();
 
