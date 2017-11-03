@@ -139,11 +139,13 @@ public class Group5 extends AbstractNegotiationParty
 		
 		// this is whether to accept the last bid
 		int satisfies = 0;
+//		double lastUtil = getUtility(this.lastBid);
 		double lastUtil = this.utilitySpace.getUtility(this.lastBid);
 		for(Map.Entry<AgentID, AdditiveUtilitySpace> e: this.lAgentUtilSpaces.entrySet())
 		{
+//			double otherUtil = e.getValue().getUtilityWithDiscount(this.lastBid, this.timeline);
 			double otherUtil = e.getValue().getUtility(this.lastBid);
-			if(lastUtil > (otherUtil + 0.2) && lastUtil > this.fReservationValue)
+			if(lastUtil > (otherUtil + 0.13) && lastUtil > this.fReservationValue)
 				satisfies++;
 		}
 		
@@ -175,10 +177,12 @@ public class Group5 extends AbstractNegotiationParty
 			{
 				double tempUtil = 0.0;
 				for(Map.Entry<AgentID, AdditiveUtilitySpace> e1: this.lAgentUtilSpaces.entrySet())
+//					tempUtil += (e1.getValue().getUtilityWithDiscount(bid.getBid(), this.timeline) + 0.13);
 					tempUtil += (e1.getValue().getUtility(bid.getBid()) + 0.13);
-				if(this.utilitySpace.getUtility(bid.getBid()) < minUtil)
+				if(getUtility(bid.getBid()) < minUtil)
 				{
 					newbid = bid.getBid();
+//					minUtil = getUtility(bid.getBid());
 					minUtil = this.utilitySpace.getUtility(bid.getBid());
 				}
 				if(tempUtil > maxOppUtil)
@@ -196,20 +200,13 @@ public class Group5 extends AbstractNegotiationParty
 			this.lastBid = oppHighBid;
 			System.out.print("["+e.getKey()+"]" + oppHighBid.toString() + " Mine: " + this.utilitySpace.getUtility(oppHighBid) +" ");
 			for(Map.Entry<AgentID, AdditiveUtilitySpace> e1: this.lAgentUtilSpaces.entrySet())
+//				System.out.print(e1.getKey().toString() + " " + e1.getValue().getUtilityWithDiscount(oppHighBid, this.timeline) + " ");
 				System.out.print(e1.getKey().toString() + " " + e1.getValue().getUtility(oppHighBid) + " ");
 			System.out.println();
 			break;
 		}
 
-		return new Offer(newbid);
-	}
-	
-	private Double getSkewedUtility(Bid bid)
-	{
-		Double util = ((getUtility(bid)/fDiscountFactor) - fReservationValue)/(1 - fReservationValue);
-		Double timeUtil = 1 - java.lang.Math.pow(this.timeline.getCurrentTime()/this.timeline.getTotalTime(), fBeta);
-		util = util * timeUtil;
-		return util;
+		return new Offer(oppHighBid);
 	}
 
 	/**
@@ -382,12 +379,14 @@ public class Group5 extends AbstractNegotiationParty
 		
 		for(BidDetails bid: this.lOutcomeSpace)
 		{
+//			double tempUtil = getUtility(bid.getBid());
 			double tempUtil = this.utilitySpace.getUtility(bid.getBid());
 			int satisfies = 0;
 			for(Map.Entry<AgentID, AdditiveUtilitySpace> e: this.lAgentUtilSpaces.entrySet())
 			{
+//				double otherUtil = e.getValue().getUtilityWithDiscount(bid.getBid(), this.timeline);
 				double otherUtil = e.getValue().getUtility(bid.getBid());
-				if(tempUtil > (otherUtil + 0.2) && tempUtil > this.fReservationValue)
+				if(tempUtil > (otherUtil + 0.13) && tempUtil > this.fReservationValue)
 				{
 					satisfies++;
 //					System.out.println(bid.getBid().toString() + " Mine: " + tempUtil + " Other: " + otherUtil);
@@ -405,10 +404,5 @@ public class Group5 extends AbstractNegotiationParty
 			}
 		}
 		return allBidEvals;
-	}
-	
-	private double getValueEvaulation(AbstractUtilitySpace utilSpace, Issue issue, ValueDiscrete value) throws Exception
-	{
-		return ((EvaluatorDiscrete)((AdditiveUtilitySpace)utilSpace).getEvaluator(issue.getNumber())).getEvaluation(value);
 	}
 }
