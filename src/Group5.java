@@ -152,6 +152,10 @@ public class Group5 extends AbstractNegotiationParty
 		if(satisfies == this.lAgentUtilSpaces.size())
 			return new Accept();
 		
+		// accept conditions for last 5 rounds
+		if(nCurrentRound >= nRounds - 5 && this.utilitySpace.getUtility(this.lastBid) > (0.7 - 0.02*(5 - nRounds + nCurrentRound)))
+			return new Accept();
+
 		// The following is a fail safe
 		Bid newbid = lOutcomeSpace.get(nCount).getBid();
 		Bid oppHighBid = null;
@@ -386,6 +390,8 @@ public class Group5 extends AbstractNegotiationParty
 			{
 //				double otherUtil = e.getValue().getUtilityWithDiscount(bid.getBid(), this.timeline);
 				double otherUtil = e.getValue().getUtility(bid.getBid());
+				if(otherUtil < 0.1)
+					continue;
 				if(tempUtil > (otherUtil + 0.13) && tempUtil > this.fReservationValue)
 				{
 					satisfies++;
